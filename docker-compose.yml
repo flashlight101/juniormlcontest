@@ -1,0 +1,57 @@
+version: '3'
+
+# docker-compose -f docker-compose.dev.yml build
+# docker-compose -f docker-compose.dev.yml up -d
+services:
+  jupyter:
+      image: jupyter/base-notebook:latest
+      container_name: python_notebook
+      volumes:
+        - ~/Documents/notebooks:/home/notebooks
+      ports:
+        - "8888:8888"
+  app:
+    build: ./app
+    container_name: flask_azz_yt
+    command: gunicorn --bind 0.0.0.0:5000 app:app # WSGI server
+    environment:
+      - DATABASE_URL=postgresql://az_user:az_psw@db:5432/az_dbname # путь до бд, см. db service
+    volumes:
+      - ./app:/app
+    expose:
+      - 5000
+    depends_on:
+      - db
+  db:
+    image: postgres:13-alpine
+    volumes:
+      - ./pg_db:/var/lib/postgresql/data/
+      - /home/flashlight/Downloa/movies.csv:/var/lib/postgresql/data/pgdata
+    environment:
+      - POSTGRES_USER=az_user
+      - POSTGRES_PASSWORD=az_psw
+      - POSTGRES_DB=az_dbname
+  pgadmin:
+    image: dpage/pgadmin4
+    depends_on:
+      - db
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=root@azzrael.ru
+      - PGADMIN_DEFAULT_PASSWORD=azzrael_code_yt # если сменить здесь, то нужно удалить контентер
+      - PGADMIN_LISTEN_ADDRESS=0.0.0.0 # чтобы не было косяков с nginx лушче в одну сеть с app
+      - PGADMIN_LISTEN_PORT=5555
+    volumes:
+      - /home/flashlight/Downloads/movies.csv:/docker-entrypoint-initdb.d/movies.csv
+    logging:
+      driver: none
+  nginx:
+    build: ./nginx
+    ports:
+      - 80:80
+    volumes:
+      - ./static:/home/web/default/static
+    depends_on:
+      - app
+      - pgadmin
+    logging:
+      driver: none
